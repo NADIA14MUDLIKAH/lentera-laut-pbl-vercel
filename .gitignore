@@ -1,0 +1,14 @@
+# Abaikan Virtual Environment
+venv/
+.venv/
+env/
+Venv/
+
+# Abaikan tracking log MLflow yang filenya besar
+**/mlruns/
+mlruns/
+*.pkl
+
+# Abaikan cache python
+__pycache__/
+*.pyc
