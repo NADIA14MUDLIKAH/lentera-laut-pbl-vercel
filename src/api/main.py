@@ -96,10 +96,8 @@ LOCATIONS_SEED = [
 # =====================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Tahap 1: Pemuatan Model ML ke RAM (Cold Start Prevention)
-    print("🚀 [SISTEM] Memuat 6 Arsitektur Machine Learning ke memori...")
-    load_all_models()
-    print("✅ [SISTEM] Machine Learning siap melayani inferensi.")
+    # 🔴 KITA HAPUS load_all_models() DARI SINI AGAR VERCEL TIDAK CRASH SAAT BOOTING 🔴
+    print("🚀 [SISTEM] Menginisialisasi sistem LENTERA LAUT di Vercel...")
 
     # Tahap 2: Inisialisasi Skema Basis Data
     async with engine.begin() as conn:

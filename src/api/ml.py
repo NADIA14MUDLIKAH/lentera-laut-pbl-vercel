@@ -111,50 +111,46 @@ def load_all_models():
 def generate_forecast(X_live: pd.DataFrame) -> dict:
     """
     Menerima matriks fitur lag (X_live), mengeksekusi inferensi pada 6 model ensemble 
-    berbeda secara sekuensial, dan merakit respons JSON prediksi yang tervalidasi.
+    secara sekuensial menggunakan teknik Lazy Loading untuk menghemat RAM Vercel.
     """
-    print("  [ML-ENGINE] Memeriksa status muatan model di memori...")
+    global LOADED_MODELS
+    
+    print("  [ML-ENGINE] Memuat model secara dinamis (Lazy Loading)...")
+    # Paksa muat model ke dalam RAM secara instan
+    LOADED_MODELS = {} 
     load_all_models()
     
     results = {}
-    
     print("  [ML-ENGINE] Mengonversi DataFrame menuju matriks Numpy murni...")
     X_live_np = X_live.to_numpy() 
     
     for target in TARGETS:
         print(f"  [ML-ENGINE] Melakukan inferensi untuk parameter: {target}...")
-        
         model = LOADED_MODELS[target]
         
         # Override arsitektur internal model untuk mencegah multithreading deadlock
         try:
-            # Atribut umum algoritma Scikit-Learn
             if hasattr(model, 'n_jobs'): model.n_jobs = 1
             if hasattr(model, 'nthread'): model.nthread = 1
-            
-            # Atribut spesifik modul XGBoost
-            if hasattr(model, 'get_booster'):
-                model.get_booster().set_param({'nthread': 1})
-            
-            # Atribut spesifik modul LightGBM
-            elif hasattr(model, 'booster_'):
-                model.booster_.params['num_threads'] = 1
+            if hasattr(model, 'get_booster'): model.get_booster().set_param({'nthread': 1})
+            elif hasattr(model, 'booster_'): model.booster_.params['num_threads'] = 1
         except Exception:
-            pass # Lanjutkan proses jika model (misal: LinearRegression) tidak mendefinisikan batas thread
+            pass
         
-        # Eksekusi inferensi Machine Learning
         pred_val = float(model.predict(X_live_np)[0])
         
-        # Penanganan nilai negatif yang secara fisis tidak logis
         if target in ["precipitation", "wave_height", "wind_speed_10m", "visibility"] and pred_val < 0:
             pred_val = 0.0
             
         results[target] = pred_val
-        print(f"    -> [SUKSES] Prediksi {target}: {pred_val:.3f}")
 
-    print("  [ML-ENGINE] Seluruh proses inferensi selesai secara sekuensial!")
+    # 🔴 KUNCI DI SINI: Kosongkan kembali RAM setelah prediksi selesai!
+    LOADED_MODELS.clear()
+    import gc
+    gc.collect() # Paksa Python membersihkan sampah memori instan
     
-    # Merakit objek respons yang sesuai dengan struktur Pydantic (schemas.py)
+    print("  [ML-ENGINE] Seluruh proses inferensi selesai & RAM telah dibersihkan!")
+    
     return {
         "wave_height": {
             "value": round(results["wave_height"], 2),
